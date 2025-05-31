@@ -1,2 +1,27 @@
-/venv
-/env
+# Ignore the entire data directory
+/data/
+
+# Optionally, you can ignore specific file types if you prefer not to ignore the whole folder
+.csv
+*.json
+*.pkl
+*.ipynb_checkpoints/ # Jupyter notebook checkpoints
+
+# Ignore trained models
+/models/
+
+# Ignore Python specific files
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.pytest_cache/
+.coverage
+
+# Ignore environment files
+.env
+venv/
+env/
+
+# Operating System Files
+.DS_Store # macOS
+Thumbs.db # Windows
