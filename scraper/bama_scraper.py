@@ -1,6 +1,5 @@
 # scraper/bama_scraper.py
 import requests
-
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -47,25 +46,21 @@ def parse_car_details(detail_soup):
         full_title_text = title_h1.get_text(separator=' ', strip=True)
         car_details['full_title'] = full_title_text
         
-        # Simplified parsing for brand and model from full_title
-        # This will be refined in preprocessing but an initial guess helps.
         parts = full_title_text.split(' ', 1) 
         car_details['brand'] = parts[0] if len(parts) > 0 else None
         car_details['model'] = parts[1] if len(parts) > 1 else None
         
-    # --- START: New Year and Trim extraction from subtitle holder ---
+    # 2. Extract Year and Trim from subtitle holder
     subtitle_holder = detail_soup.find('div', class_='bama-ad-detail-title__subtitle-holder')
     if subtitle_holder:
         subtitles = subtitle_holder.find_all('span', class_='bama-ad-detail-title__subtitle')
         if len(subtitles) >= 1:
-            # The first subtitle is usually the year
             year_text = clean_text(subtitles[0].get_text(strip=True))
-            if year_text.isdigit(): # Ensure it's a valid year
+            if year_text.isdigit():
                 car_details['year'] = year_text
             else:
-                car_details['year'] = None # If it's not a digit, it's not the year we expect
+                car_details['year'] = None
                 
-            # The second subtitle (if exists) is usually the trim/version
             if len(subtitles) >= 2:
                 car_details['trim_version'] = clean_text(subtitles[1].get_text(strip=True))
             else:
@@ -76,10 +71,8 @@ def parse_car_details(detail_soup):
     else:
         car_details['year'] = None
         car_details['trim_version'] = None
-    # --- END: New Year and Trim extraction ---
 
-
-    # 2. Extract Price
+    # 3. Extract Price
     price_span = detail_soup.find('span', class_='bama-ad-detail-price__price-text')
     if price_span:
         price_text = price_span.get_text(strip=True) 
@@ -87,15 +80,16 @@ def parse_car_details(detail_soup):
     else:
         car_details['price'] = None
 
-    # 3. Extract Location
+    # 4. Extract Location
     address_span = detail_soup.find('span', class_='address-text')
     car_details['location'] = clean_text(address_span.text) if address_span else None
 
-    # 4. Extract other details from 'bama-vehicle-detail-with-icon__detail-holder'
+    # 5. Extract other details from 'bama-vehicle-detail-with-icon__detail-holder'
     detail_holders = detail_soup.find_all('div', class_='bama-vehicle-detail-with-icon__detail-holder')
     for holder in detail_holders:
         label_span = holder.find('span') 
-        value_tag = holder.find('p', class_='dir-ltr') or holder.find('div', class_='bama-vehicle-detail-with-icon__detail-value') or holder.find('span', recursive=False)
+        # MODIFIED: Changed value_tag finding to include 'p' without specific class
+        value_tag = holder.find('p', class_='dir-ltr') or holder.find('p') or holder.find('div', class_='bama-vehicle-detail-with-icon__detail-value') or holder.find('span', recursive=False)
         
         if label_span and value_tag:
             label = clean_text(label_span.text)
@@ -105,7 +99,7 @@ def parse_car_details(detail_soup):
                 car_details['mileage'] = value
             elif 'نوع سوخت' in label:
                 car_details['fuel_type'] = value
-            elif 'گیربکس' in label: # This will now capture the actual gearbox type
+            elif 'گیربکس' in label:
                 car_details['gearbox'] = value
             elif 'وضعیت بدنه' in label:
                 car_details['body_condition'] = value
@@ -237,11 +231,9 @@ def scrape_bama_cars_selenium(base_listing_url, target_ad_count=100, max_scrolls
             response.raise_for_status()
             detail_soup = BeautifulSoup(response.text, 'html.parser')
             
-            # Use a more robust way to find the main detail section
-            # Check for specific detail sections first, then broader ones
             detail_section = detail_soup.find('div', class_='bama-ad-detail-section')
-            if not detail_section: # If the main section isn't found by its main class
-                detail_section = detail_soup.find('div', class_='bama-ad-detail-wrapper') # Try the wrapper inside
+            if not detail_section: 
+                detail_section = detail_soup.find('div', class_='bama-ad-detail-wrapper') 
 
             if detail_section: 
                 car_data = parse_car_details(detail_section)
@@ -263,7 +255,6 @@ def scrape_bama_cars_selenium(base_listing_url, target_ad_count=100, max_scrolls
     return df
 
 if __name__ == "__main__":
-    # Define the output directory
     output_dir = '../data/raw/'
     os.makedirs(output_dir, exist_ok=True) 
 
