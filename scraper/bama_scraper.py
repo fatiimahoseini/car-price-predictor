@@ -41,28 +41,48 @@ def parse_car_details(detail_soup):
     """
     car_details = {}
 
-    # 1. Extract Title (Brand, Model, Year)
-    # The title structure is h1.bama-ad-detail-title__title with inner spans/text
+    # 1. Extract Title (Brand, Model)
     title_h1 = detail_soup.find('h1', class_='bama-ad-detail-title__title')
     if title_h1:
         full_title_text = title_h1.get_text(separator=' ', strip=True)
         car_details['full_title'] = full_title_text
         
-        match_year = re.search(r'\((\d{4})\)', full_title_text)
-        car_details['year'] = clean_text(match_year.group(1)) if match_year else None
-        
-        clean_title = full_title_text.replace(f'({car_details["year"]})', '').strip() if car_details['year'] else full_title_text
-        
-        # Heuristic parsing for brand and model
-        parts = clean_title.split(' ', 1) 
+        # Simplified parsing for brand and model from full_title
+        # This will be refined in preprocessing but an initial guess helps.
+        parts = full_title_text.split(' ', 1) 
         car_details['brand'] = parts[0] if len(parts) > 0 else None
         car_details['model'] = parts[1] if len(parts) > 1 else None
         
+    # --- START: New Year and Trim extraction from subtitle holder ---
+    subtitle_holder = detail_soup.find('div', class_='bama-ad-detail-title__subtitle-holder')
+    if subtitle_holder:
+        subtitles = subtitle_holder.find_all('span', class_='bama-ad-detail-title__subtitle')
+        if len(subtitles) >= 1:
+            # The first subtitle is usually the year
+            year_text = clean_text(subtitles[0].get_text(strip=True))
+            if year_text.isdigit(): # Ensure it's a valid year
+                car_details['year'] = year_text
+            else:
+                car_details['year'] = None # If it's not a digit, it's not the year we expect
+                
+            # The second subtitle (if exists) is usually the trim/version
+            if len(subtitles) >= 2:
+                car_details['trim_version'] = clean_text(subtitles[1].get_text(strip=True))
+            else:
+                car_details['trim_version'] = None
+        else:
+            car_details['year'] = None
+            car_details['trim_version'] = None
+    else:
+        car_details['year'] = None
+        car_details['trim_version'] = None
+    # --- END: New Year and Trim extraction ---
+
+
     # 2. Extract Price
-    # Updated: Removed --negotiable class from find, as it might be dynamic/conditional
     price_span = detail_soup.find('span', class_='bama-ad-detail-price__price-text')
     if price_span:
-        price_text = price_span.get_text(strip=True) # Get the text from the span itself
+        price_text = price_span.get_text(strip=True) 
         car_details['price'] = clean_text(price_text)
     else:
         car_details['price'] = None
@@ -75,7 +95,6 @@ def parse_car_details(detail_soup):
     detail_holders = detail_soup.find_all('div', class_='bama-vehicle-detail-with-icon__detail-holder')
     for holder in detail_holders:
         label_span = holder.find('span') 
-        # Try to find the value in a 'p' tag with 'dir-ltr' or any direct child 'div' or 'span' (non-recursive to avoid nested labels)
         value_tag = holder.find('p', class_='dir-ltr') or holder.find('div', class_='bama-vehicle-detail-with-icon__detail-value') or holder.find('span', recursive=False)
         
         if label_span and value_tag:
@@ -86,7 +105,7 @@ def parse_car_details(detail_soup):
                 car_details['mileage'] = value
             elif 'نوع سوخت' in label:
                 car_details['fuel_type'] = value
-            elif 'گیربکس' in label:
+            elif 'گیربکس' in label: # This will now capture the actual gearbox type
                 car_details['gearbox'] = value
             elif 'وضعیت بدنه' in label:
                 car_details['body_condition'] = value
@@ -100,7 +119,6 @@ def parse_car_details(detail_soup):
                 car_details['technical_inspection_status'] = value
             elif 'آپشن' in label: 
                 car_details['options'] = value
-            # Add more specific conditions for other details as needed
     
     return car_details
 
@@ -211,7 +229,6 @@ def scrape_bama_cars_selenium(base_listing_url, target_ad_count=100, max_scrolls
         'Connection': 'keep-alive',
     }
 
-    # Iterate through the collected ad links and scrape details
     for i, ad_url in enumerate(all_ad_links_list):
         print(f"Scraping details from ad {i+1}/{len(all_ad_links_list)}: {ad_url}")
         
@@ -220,20 +237,13 @@ def scrape_bama_cars_selenium(base_listing_url, target_ad_count=100, max_scrolls
             response.raise_for_status()
             detail_soup = BeautifulSoup(response.text, 'html.parser')
             
-            # --- START: Modified detail section finding ---
-            # Based on new structure, the main section is now just 'bama-ad-detail-section'
-            # without the 'bama-ad-detail-modal__section' part.
+            # Use a more robust way to find the main detail section
+            # Check for specific detail sections first, then broader ones
             detail_section = detail_soup.find('div', class_='bama-ad-detail-section')
-            
-            # Additional check: Sometimes the wrapper is inside another div
-            # You provided: div main-wrapper adlist-page-wrapper -> div bama-ad-detail-section -> div bama-ad-detail-wrapper
-            # Let's try to find bama-ad-detail-wrapper if bama-ad-detail-section isn't enough
-            if not detail_section:
-                detail_section = detail_soup.find('div', class_='bama-ad-detail-wrapper')
-            # --- END: Modified detail section finding ---
+            if not detail_section: # If the main section isn't found by its main class
+                detail_section = detail_soup.find('div', class_='bama-ad-detail-wrapper') # Try the wrapper inside
 
-
-            if detail_section: # Make sure we found *some* detail section
+            if detail_section: 
                 car_data = parse_car_details(detail_section)
                 car_data['ad_url'] = ad_url 
                 car_data['scrape_date'] = pd.Timestamp.now()
