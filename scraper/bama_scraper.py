@@ -203,7 +203,7 @@ def scrape_bama_cars_selenium(base_listing_url, target_ad_count=100, max_scrolls
                 print("No more content loaded after scrolling (scrollHeight did not change). Reached end of page or content.")
                 break 
 
-            time.sleep(random.uniform(2, 4)) 
+            time.sleep(random.uniform(5, 8)) 
 
             new_links = get_unique_ad_links_from_page_source(driver.page_source)
             if new_links.issubset(ad_links_to_scrape): 
@@ -264,7 +264,7 @@ if __name__ == "__main__":
     output_dir = '../data/raw/'
     os.makedirs(output_dir, exist_ok=True) 
 
-    bama_base_url_for_selenium = 'https://bama.ir/car/peugeot' 
+    bama_base_url_for_selenium = 'https://bama.ir/car' 
 
     parsed_url = urlparse(bama_base_url_for_selenium)
     path_segments = [s for s in parsed_url.path.split('/') if s] 
@@ -273,8 +273,8 @@ if __name__ == "__main__":
     if len(path_segments) >= 2 and path_segments[0] == 'car':
         filename_identifier = path_segments[-1] 
     
-    target_ads = 50 
-    max_scrolls_limit = 10 
+    target_ads = 500 
+    max_scrolls_limit = 70 
 
     scraped_df = scrape_bama_cars_selenium(bama_base_url_for_selenium, 
                                            target_ad_count=target_ads, 
