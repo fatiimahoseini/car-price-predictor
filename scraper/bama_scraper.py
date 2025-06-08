@@ -1,5 +1,6 @@
 # scraper/bama_scraper.py
 import requests
+
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -17,15 +18,20 @@ from urllib.parse import urlparse
 from selenium.webdriver.chrome.service import Service as ChromeService
 
 
-def clean_text(text):
-    """Cleans and normalizes Persian text."""
+def clean_text(text, for_label=False): # Added a new argument: for_label
+    """Cleans and normalizes Persian text.
+    If for_label is True, it only strips and converts Persian digits,
+    leaving spaces and other characters for label matching.
+    """
     if text:
         text = text.strip()
-        text = text.replace('تومان', '').replace(' ', '').replace(',', '').replace('کیلومتر', '').replace('K.M', '')
         persian_digits = '۰۱۲۳۴۵۶۷۸۹'
         english_digits = '0123456789'
         translation_table = str.maketrans(persian_digits, english_digits)
         text = text.translate(translation_table)
+
+        if not for_label: # Apply these replacements only for values, not for labels
+            text = text.replace('تومان', '').replace(' ', '').replace(',', '').replace('کیلومتر', '').replace('K.M', '')
     return text
 
 def parse_car_details(detail_soup):
@@ -76,7 +82,7 @@ def parse_car_details(detail_soup):
     price_span = detail_soup.find('span', class_='bama-ad-detail-price__price-text')
     if price_span:
         price_text = price_span.get_text(strip=True) 
-        car_details['price'] = clean_text(price_text)
+        car_details['price'] = clean_text(price_text) # Use clean_text for price value
     else:
         car_details['price'] = None
 
@@ -88,13 +94,13 @@ def parse_car_details(detail_soup):
     detail_holders = detail_soup.find_all('div', class_='bama-vehicle-detail-with-icon__detail-holder')
     for holder in detail_holders:
         label_span = holder.find('span') 
-        # MODIFIED: Changed value_tag finding to include 'p' without specific class
         value_tag = holder.find('p', class_='dir-ltr') or holder.find('p') or holder.find('div', class_='bama-vehicle-detail-with-icon__detail-value') or holder.find('span', recursive=False)
         
         if label_span and value_tag:
-            label = clean_text(label_span.text)
-            value = clean_text(value_tag.text)
+            label = clean_text(label_span.text, for_label=True) # Use clean_text with for_label=True for labels
+            value = clean_text(value_tag.text) # Use clean_text for values
             
+            # Now these conditions should match correctly with spaces
             if 'کارکرد' in label:
                 car_details['mileage'] = value
             elif 'نوع سوخت' in label:
