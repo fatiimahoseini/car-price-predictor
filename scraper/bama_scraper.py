@@ -264,7 +264,7 @@ if __name__ == "__main__":
     output_dir = '../data/raw/'
     os.makedirs(output_dir, exist_ok=True) 
 
-    bama_base_url_for_selenium = 'https://bama.ir/car' 
+    bama_base_url_for_selenium = 'https://bama.ir/car?mileage=1' 
 
     parsed_url = urlparse(bama_base_url_for_selenium)
     path_segments = [s for s in parsed_url.path.split('/') if s] 
